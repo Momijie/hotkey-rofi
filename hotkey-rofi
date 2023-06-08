@@ -1,0 +1,67 @@
+#!/bin/bash
+
+#Copyright (C) 2023 Momijie
+
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
+text_path="$HOME/.config/rofi/hotkey-rofi/text"
+function read_file () {
+    local file="$1"
+    local not_found="$2"
+    local name="$3"
+    local i=0
+    if [ -f "$file" ]; then
+        while IFS= read -r line; do
+            if check_parse "$line" "check:"; then
+                local value="${line#*:}"
+                # Checks to see if the check in the file is held within
+                # the WM_NAME property.
+                if [[ "${name,,}" == *"${value,,}"* ]]; then
+                    read_file "$text_path/$value" "$not_found"
+                    return
+                fi
+            else
+                i=$((i+1))
+                echo "$line"
+            fi
+        done < "$file"
+    fi
+
+    if [[ "$i" -eq "0"  ]]; then
+        echo "$not_found"
+    fi
+}
+
+function check_parse () {
+    local line="$1"
+    local check="$2"
+    if [[ ${line,,} =~ ^"$check" ]]; then
+        local value="${line#*:}"
+        return 0
+    fi
+    return 1
+}
+
+function main () {
+    id=$(xdo id)
+    props=$(xprop -id "$id")
+    class=$(echo "$props" | sed -n 's/^WM_CLASS(STRING) = "\([^"]*\)", "\([^"]*\)".*$/\2/p')
+    name=$(xprop -id "$id" WM_NAME)
+    if [[ "$class" == "" ]]; then
+        class="root"
+    fi
+    read_file "$text_path/$class" "No keymaps for $class" "$name"
+}
+
+main
